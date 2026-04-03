@@ -2,9 +2,10 @@ from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.routes import analyze, health
+from app.routes.multi_prescription import router as multi_router
 
 # ---------------------------------------------------------------------------
-# App instance
+# App instance (CREATE FIRST)
 # ---------------------------------------------------------------------------
 
 app = FastAPI(
@@ -20,13 +21,13 @@ app = FastAPI(
 )
 
 # ---------------------------------------------------------------------------
-# CORS – allow the Next.js frontend on any localhost port during development
+# CORS – allow frontend
 # ---------------------------------------------------------------------------
 
 app.add_middleware(
     CORSMiddleware,
     allow_origins=[
-        "http://localhost:3000",   # Next.js default dev port
+        "http://localhost:3000",
         "http://localhost:3001",
         "http://127.0.0.1:3000",
         "http://127.0.0.1:3001",
@@ -37,15 +38,15 @@ app.add_middleware(
 )
 
 # ---------------------------------------------------------------------------
-# Routers
+# Routers (ADD AFTER app is created)
 # ---------------------------------------------------------------------------
 
 app.include_router(health.router, prefix="/api")
 app.include_router(analyze.router, prefix="/api")
-
+app.include_router(multi_router, prefix="/api")   # ✅ YOUR NEW ROUTE
 
 # ---------------------------------------------------------------------------
-# Root redirect hint
+# Root endpoint
 # ---------------------------------------------------------------------------
 
 @app.get("/", include_in_schema=False)
@@ -55,4 +56,5 @@ async def root():
         "docs": "/docs",
         "health": "/api/health",
         "analyze": "POST /api/analyze",
+        "multi_analyze": "POST /api/analyze-multiple"
     }

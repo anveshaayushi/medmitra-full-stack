@@ -9,6 +9,7 @@ import { ThemeProvider } from "@/components/theme-provider";
 export interface AnalysisResult {
   medications: {
     name: string;
+    genericName: string;
     dosage: string;
     frequency: string;
     purpose: string;
@@ -24,60 +25,82 @@ export interface AnalysisResult {
 }
 
 export default function DawaAI() {
-  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(
-    null,
-  );
+  const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
+  const [rawResult, setRawResult] = useState<Record<string, unknown>>({});
   const [isAnalyzing, setIsAnalyzing] = useState(false);
 
-  // 🔥 FINAL HANDLE ANALYZE
-  const handleAnalyze = async (file: File) => {
+  // ✅ UPDATED: now accepts multiple files
+  const handleAnalyze = async (files: File[]) => {
     setIsAnalyzing(true);
 
     try {
-      // 1. Send file to backend
       const formData = new FormData();
-      formData.append("file", file);
 
-      const response = await fetch("http://127.0.0.1:8000/api/analyze", {
+      files.forEach((file) => {
+        formData.append("files", file); // IMPORTANT: backend expects "files"
+      });
+
+      const response = await fetch("http://127.0.0.1:8000/api/analyze-multiple", {
         method: "POST",
         body: formData,
       });
 
-      if (!response.ok) {
-        throw new Error("Failed to analyze prescription");
-      }
+      if (!response.ok) throw new Error("Failed to analyze prescription");
 
       const dataResponse = await response.json();
       console.log("API RESPONSE:", dataResponse);
 
-      // 2. Map backend → frontend UI
+      setRawResult(dataResponse);
+
       const formattedResult: AnalysisResult = {
         medications:
           dataResponse.medication_summary?.map((m: any) => ({
-            name: m.canonical_name || m.original_name || "Unknown",
-            dosage: m.dosage || "N/A",
-            frequency: m.frequency || "N/A",
-            purpose: "—",
+            name: m.original_name || m.canonical_name || "Unknown",
+            genericName: m.canonical_name || "",
+            dosage: m.dose_mg ? `${m.dose_mg}mg` : "N/A",
+            frequency:
+              m.freq_per_day && m.freq_per_day > 0
+                ? `${m.freq_per_day}x/day`
+                : "N/A",
+            purpose:
+              [m.notes, m.duration].filter(Boolean).join(" · ") || "—",
           })) || [],
 
         warnings:
-          dataResponse.clinical_alerts?.map((w: any) => ({
-            type:
-              w.severity === "high"
-                ? "high"
-                : w.severity === "medium"
-                  ? "moderate"
-                  : "low",
-            title: "Drug Interaction",
-            description: w.message || "Interaction detected",
-          })) || [],
+  dataResponse.clinical_alerts
+    ?.filter((w: any) => w.severity !== "low")   // 🔥 REMOVE LOW
+    .map((w: any) => ({
+      type:
+        w.severity === "high"
+          ? "high"
+          : "moderate",
+      title: w.drugs_involved?.join(" + ") || "Drug Interaction",
+      description: `${w.what_happens || w.message || "Interaction detected"} — ${
+        w.what_to_do || ""
+      }`.trim(),
+    })) || [],
 
         duplicates:
           dataResponse.duplicate_alerts?.map((d: any) => d.message) || [],
 
-        instructions: ["Follow doctor's advice"],
+        instructions: [
+          ...(dataResponse.overdose_alerts?.map(
+            (o: any) => `⚠️ Overdose risk: ${o.message}`
+          ) || []),
+          ...(dataResponse.duplicate_alerts?.map(
+            (d: any) => `🔁 ${d.message} — ${d.recommendation}`
+          ) || []),
+          "Always follow your doctor's prescribed dosage and timing.",
+        ],
 
-        summary: `Risk Level: ${dataResponse.risk_score?.label || "Unknown"}`,
+        // ✅ shows number of prescriptions analyzed
+        summary: `Analyzed ${
+          dataResponse.total_prescriptions || files.length
+        } prescription(s) — Patient: ${
+          dataResponse.patient_name || "User"
+        } — Risk Level: ${
+          dataResponse.risk_score?.label || "Unknown"
+        }`,
       };
 
       setAnalysisResult(formattedResult);
@@ -91,6 +114,7 @@ export default function DawaAI() {
 
   const handleReset = () => {
     setAnalysisResult(null);
+    setRawResult({});
   };
 
   return (
@@ -104,14 +128,20 @@ export default function DawaAI() {
           <div className="absolute -bottom-20 left-1/3 w-96 h-96 bg-orange-glow/10 rounded-full blur-3xl" />
         </div>
 
-        {/* Main UI */}
         <div className="relative z-10">
           <Header />
 
           {analysisResult ? (
-            <ResultsDashboard result={analysisResult} onReset={handleReset} />
+            <ResultsDashboard
+              result={analysisResult}
+              rawResult={rawResult}
+              onReset={handleReset}
+            />
           ) : (
-            <HeroSection onAnalyze={handleAnalyze} isAnalyzing={isAnalyzing} />
+            <HeroSection
+              onAnalyze={handleAnalyze}   // ✅ now expects File[]
+              isAnalyzing={isAnalyzing}
+            />
           )}
         </div>
       </div>

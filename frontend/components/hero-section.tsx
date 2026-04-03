@@ -8,23 +8,24 @@ import { cn } from "@/lib/utils"
 import { Spinner } from "@/components/ui/spinner"
 
 interface HeroSectionProps {
-  onAnalyze: (file: File) => void
-  isAnalyzing: boolean
+  onAnalyze: (files: File[]) => Promise<void>;
+  isAnalyzing: boolean;
 }
 
 export function HeroSection({ onAnalyze, isAnalyzing }: HeroSectionProps) {
-  const [selectedFile, setSelectedFile] = useState<File | null>(null)
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([])
   const [preview, setPreview] = useState<string | null>(null)
 
   const onDrop = useCallback((acceptedFiles: File[]) => {
-    const file = acceptedFiles[0]
-    if (file) {
-      setSelectedFile(file)
+    if (acceptedFiles.length > 0) {
+      setSelectedFiles(acceptedFiles)
+
+      // show preview of first image only
       const reader = new FileReader()
       reader.onload = () => {
         setPreview(reader.result as string)
       }
-      reader.readAsDataURL(file)
+      reader.readAsDataURL(acceptedFiles[0])
     }
   }, [])
 
@@ -32,19 +33,20 @@ export function HeroSection({ onAnalyze, isAnalyzing }: HeroSectionProps) {
     onDrop,
     accept: {
       "image/*": [".png", ".jpg", ".jpeg", ".webp"],
+      "application/json": [".json"],
     },
-    maxFiles: 1,
+    maxFiles: 5, // ✅ allow multiple uploads
     disabled: isAnalyzing,
   })
 
   const handleAnalyze = () => {
-    if (selectedFile) {
-      onAnalyze(selectedFile)
+    if (selectedFiles.length > 0) {
+      onAnalyze(selectedFiles) // ✅ FIXED
     }
   }
 
   const handleClear = () => {
-    setSelectedFile(null)
+    setSelectedFiles([])
     setPreview(null)
   }
 
@@ -61,7 +63,7 @@ export function HeroSection({ onAnalyze, isAnalyzing }: HeroSectionProps) {
           <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent"> Analysis</span>
         </h1>
         <p className="mx-auto mb-12 max-w-2xl text-balance text-lg text-muted-foreground md:text-xl">
-          Upload your prescription and let our AI analyze medications, detect interactions, and provide personalized safety recommendations.
+          Upload your prescription(s) and let our AI analyze medications, detect interactions, and provide personalized safety recommendations.
         </p>
       </div>
 
@@ -79,7 +81,7 @@ export function HeroSection({ onAnalyze, isAnalyzing }: HeroSectionProps) {
             )}
           >
             <input {...getInputProps()} />
-            
+
             {preview ? (
               <div className="relative">
                 <img
@@ -87,6 +89,14 @@ export function HeroSection({ onAnalyze, isAnalyzing }: HeroSectionProps) {
                   alt="Prescription preview"
                   className="mx-auto max-h-64 rounded-lg object-contain"
                 />
+
+                {/* show file count */}
+                {selectedFiles.length > 1 && (
+                  <p className="mt-2 text-sm text-muted-foreground">
+                    + {selectedFiles.length - 1} more file(s)
+                  </p>
+                )}
+
                 {!isAnalyzing && (
                   <Button
                     variant="secondary"
@@ -111,10 +121,10 @@ export function HeroSection({ onAnalyze, isAnalyzing }: HeroSectionProps) {
                   )}
                 </div>
                 <p className="mb-2 text-lg font-medium text-foreground">
-                  {isDragActive ? "Drop your prescription here" : "Drag & drop your prescription"}
+                  {isDragActive ? "Drop your prescriptions here" : "Drag & drop your prescriptions"}
                 </p>
                 <p className="text-sm text-muted-foreground">
-                  or click to browse • PNG, JPG, WEBP
+                  Multiple files supported • PNG, JPG, WEBP, JSON
                 </p>
               </div>
             )}
@@ -122,18 +132,18 @@ export function HeroSection({ onAnalyze, isAnalyzing }: HeroSectionProps) {
 
           <Button
             onClick={handleAnalyze}
-            disabled={!selectedFile || isAnalyzing}
+            disabled={selectedFiles.length === 0 || isAnalyzing}
             className="mt-6 w-full bg-gradient-to-r from-primary to-accent py-6 text-lg font-semibold text-primary-foreground shadow-lg transition-all hover:opacity-90 hover:shadow-xl disabled:opacity-50"
           >
             {isAnalyzing ? (
               <>
                 <Spinner className="mr-2 h-5 w-5" />
-                Analyzing Prescription...
+                Analyzing {selectedFiles.length} prescription(s)...
               </>
             ) : (
               <>
                 <Sparkles className="mr-2 h-5 w-5" />
-                Analyze Prescription
+                Analyze {selectedFiles.length > 1 ? "Prescriptions" : "Prescription"}
               </>
             )}
           </Button>
