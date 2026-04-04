@@ -7,9 +7,12 @@ MedMitra is a full-stack web application that helps patients and caregivers anal
 ## Demo Video Link:-
 https://youtu.be/GGpIeZvc7e4?si=g7EakXEv-WHRb3Pd
 
-We have used these two Prescription images in our Demo Video:-
-Prescription image 1: docs\Prescription1.jpeg
-Prescription image 2: docs\Prescription2.jpeg
+## 📄 Sample Prescriptions
+
+<p align="center">
+  <img src="docs/Prescription1.jpeg" width="300"/>
+  <img src="docs/Prescription2.jpeg" width="300"/>
+</p>
 
 ## Features
 
