@@ -1,55 +1,38 @@
 from typing import List
-from .prescriptionanalyser import (
-    extract_meds_with_gemini,
-    analyzeprescription
-)
+# ← Change: import from the 3 separate service files instead of prescriptionanalyser
+from app.services.ocr_service      import process_image_bytes_list
+from app.services.analysis_service import analyze_medications
 
 
-def analyze_multiple_images(image_files: List[bytes], patient_name="User"):
+def analyze_multiple_images(image_files: List[bytes], patient_name: str = "User") -> dict:
     """
-    Combines multiple prescription images into ONE patient-level analysis
+    Pipeline:
+      1. ocr_service      → extract meds from each image (ocr.py)
+      2. analysis_service → run full Gemini safety analysis (p2.py)
+    WhatsApp is triggered separately via the /send-whatsapp route (twilio.py)
     """
-
-    all_meds = []
-
     print(f"\n📦 Processing {len(image_files)} prescription(s)...")
 
-    for idx, image_bytes in enumerate(image_files):
-        print(f"\n📄 Processing Prescription {idx + 1}")
+    # Step 1 — OCR (ocr_service.py)
+    # Build (filename, bytes) tuples for source tracking
+    named_files = [
+        (f"Prescription {idx + 1}", image_bytes)
+        for idx, image_bytes in enumerate(image_files)
+    ]
+    all_meds = process_image_bytes_list(named_files)
 
-        meds = extract_meds_with_gemini(image_bytes)
-
-        if not meds:
-            print("  ⚠️ No medicines detected in this image")
-            continue
-
-        for m in meds:
-            # Safety check
-            if not isinstance(m, dict) or not m.get("name"):
-                continue
-
-            # Add source info (VERY useful for debugging + UI)
-            m["source"] = f"Prescription {idx + 1}"
-
-            all_meds.append(m)
-
-    # ❌ No meds found at all
     if not all_meds:
         return {
-            "status": "error",
-            "message": "No medicines detected in any uploaded image"
+            "status":  "error",
+            "message": "No medicines detected in any uploaded image",
         }
 
     print(f"\n🧠 Total medicines combined: {len(all_meds)}")
 
-    # 🔥 SINGLE COMBINED ANALYSIS
-    result = analyzeprescription(
-        {"meds": all_meds},
-        patientname=patient_name
-    )
+    # Step 2 — Analysis (analysis_service.py / p2.py)
+    result = analyze_medications(all_meds, patient_name=patient_name)
 
-    # Optional: attach metadata
     result["total_prescriptions"] = len(image_files)
-    result["total_medicines"] = len(all_meds)
+    result["total_medicines"]     = len(all_meds)
 
     return result

@@ -75,9 +75,7 @@ export default function DawaAI() {
           ? "high"
           : "moderate",
       title: w.drugs_involved?.join(" + ") || "Drug Interaction",
-      description: `${w.what_happens || w.message || "Interaction detected"} — ${
-        w.what_to_do || ""
-      }`.trim(),
+      description: `${w.what_happens || w.mechanism || w.message || "Interaction detected"} — ${w.what_to_do || w.recommendation || ""}`.trim(),
     })) || [],
 
         duplicates:

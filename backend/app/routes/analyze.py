@@ -1,11 +1,9 @@
 import json
 from fastapi import APIRouter, UploadFile, File
 from pydantic import BaseModel
-from app.services.prescriptionanalyser import (
-    analyzeprescription,
-    extract_meds_with_gemini,
-    send_whatsapp_summary,
-)
+from app.services.whatsapp_service import send_whatsapp_summary
+from app.services.ocr_service      import extract_medicine_data
+from app.services.analysis_service import analyze_medications
 
 router = APIRouter()
 
@@ -14,8 +12,8 @@ router = APIRouter()
 
 @router.post("/analyze")
 async def analyze_prescription(file: UploadFile = File(...)):
-    file_bytes = await file.read()
-    filename   = file.filename or ""
+    file_bytes   = await file.read()
+    filename     = file.filename or ""
     content_type = file.content_type or ""
 
     # JSON file upload
@@ -35,12 +33,13 @@ async def analyze_prescription(file: UploadFile = File(...)):
             meds         = []
             patient_name = "User"
     else:
-        # Image upload — use Gemini OCR
-        meds         = extract_meds_with_gemini(file_bytes)
+        # Image upload — use ocr_service (ocr.py)
+        meds         = extract_medicine_data(file_bytes, source_name=filename)
         patient_name = "User"
 
     print("EXTRACTED MEDS:", meds)
-    return analyzeprescription({"meds": meds}, patient_name)
+    # analysis_service (p2.py)
+    return analyze_medications(meds, patient_name)
 
 
 # ── POST /api/send-whatsapp ───────────────────────────────────────────────────
@@ -50,7 +49,6 @@ class WhatsAppRequest(BaseModel):
     analysis_result: dict
 
 
-@router.post("/send-whatsapp")
-async def send_whatsapp(body: WhatsAppRequest):
-    result = send_whatsapp_summary(body.analysis_result, body.phone_number)
-    return result
+@router.post("/send-whatsapp", tags=["WhatsApp"])
+async def send_whatsapp(request: WhatsAppRequest):
+    return send_whatsapp_summary(request.analysis_result, request.phone_number)
