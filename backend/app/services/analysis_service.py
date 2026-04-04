@@ -2,17 +2,10 @@ import json
 import os
 import re
 import time
+from itertools import combinations
 from google import genai
 from dotenv import load_dotenv
 load_dotenv()
-
-# ── Changes from original p2.py ───────────────────────────────────────────
-# 1. Removed argparse / CLI entry point entirely
-# 2. Removed file I/O (no reading/writing JSON files)
-# 3. Exposed analyze_medications(meds: list, patient_name: str) -> dict
-#    that the FastAPI service layer calls directly
-# 4. Everything else (SYSTEM_PROMPT, patch, strip_fences) identical
-# ──────────────────────────────────────────────────────────────────────────
 
 GEMINI_MODEL = "gemini-2.5-flash"
 
@@ -79,12 +72,10 @@ Scoring rules:
 
 Field rules:
   - freq_per_day: PRN / SOS / as-needed = 0, once daily = 1, BD = 2, TDS = 3, QID = 4, weekly = 0
-  - total_daily_dose_mg = dose_mg x freq_per_day (set null if freq = 0 or dose unknown)
-  - If you cannot identify a drug at all, still include it in medication_summary with
-    canonical_name = the original name, and set warning = "Could not identify drug — verify manually"
-  - medication_summary must be sorted alphabetically by canonical_name
-  - clinical_alerts must be sorted: high first, then medium, then low
-  - Never omit a key — use null instead
+  - total_daily_dose_mg = dose_mg x freq_per_day (null if unknown)
+  - Sort medication_summary alphabetically, clinical_alerts high→medium→low
+  - Never omit a key, use null instead
+  - drugs_involved: always use the ORIGINAL name exactly as written in the prescription input (e.g. "ZERODOL MR" not "aceclofenac"). Never use generic names in drugs_involved.
 """
 
 
@@ -96,7 +87,6 @@ def _strip_fences(text: str) -> str:
 
 
 def _patch(result: dict, patient_name: str) -> dict:
-    """Fill in any missing keys so the frontend never gets KeyError."""
     result.setdefault("status",       "success")
     result.setdefault("patient_name", patient_name.title())
 
@@ -115,14 +105,12 @@ def _patch(result: dict, patient_name: str) -> dict:
         alert.setdefault("mechanism",      None)
         alert.setdefault("recommendation", None)
         alert.setdefault("drugs_involved", [])
-        # ← Compatibility: frontend uses what_happens / what_to_do keys
         alert.setdefault("what_happens", alert.get("mechanism") or alert.get("message", ""))
         alert.setdefault("what_to_do",   alert.get("recommendation") or "Consult your doctor.")
 
     for med in result.get("medication_summary", []):
         med.setdefault("canonical_name",      "unknown")
         med.setdefault("total_daily_dose_mg", None)
-        # Flatten variants into top-level fields for frontend compatibility
         variants = med.get("variants", [{}])
         first = variants[0] if variants else {}
         med.setdefault("original_name", first.get("original_name", med["canonical_name"]))
@@ -139,15 +127,32 @@ def _patch(result: dict, patient_name: str) -> dict:
             v.setdefault("route_note",    None)
             v.setdefault("warning",       None)
 
+    # ── Combo filter ──────────────────────────────────────────────────────
+    # If a 3+ drug combo alert exists, remove individual 2-drug pair alerts
+    # whose drugs are already fully covered inside that combo.
+    # Better to show one combined alert than many redundant pair alerts.
+    clinical_alerts = result.get("clinical_alerts", [])
+
+    combo_covered_pairs = set()
+    for alert in clinical_alerts:
+        drugs = alert.get("drugs_involved") or []
+        if len(drugs) >= 3:
+            for pair in combinations(drugs, 2):
+                combo_covered_pairs.add(tuple(sorted(pair)))
+
+    result["clinical_alerts"] = [
+        a for a in clinical_alerts
+        if not (
+            len(a.get("drugs_involved") or []) == 2
+            and tuple(sorted(a.get("drugs_involved") or [])) in combo_covered_pairs
+        )
+    ]
+    # ─────────────────────────────────────────────────────────────────────
+
     return result
 
 
 def analyze_medications(meds: list, patient_name: str = "User") -> dict:
-    """
-    Core analysis function.
-    Takes a flat list of medication dicts and returns the full analysis dict.
-    This is what multi_prescription.py service calls.
-    """
     if not meds:
         return {
             "status":             "no_medications_found",
@@ -158,6 +163,8 @@ def analyze_medications(meds: list, patient_name: str = "User") -> dict:
                 "low_alerts": 0, "total_alert_count": 0,
             },
             "clinical_alerts":    [],
+            "duplicate_alerts":   [],
+            "overdose_alerts":    [],
             "medication_summary": [],
         }
 
@@ -166,8 +173,6 @@ def analyze_medications(meds: list, patient_name: str = "User") -> dict:
         raise ValueError("GEMINI_API_KEY not set in environment")
 
     client = genai.Client(api_key=api_key)
-
-    # Warm-up ping (same as original p2.py)
     client.models.generate_content(model=GEMINI_MODEL, contents="reply: ok")
     time.sleep(1)
 

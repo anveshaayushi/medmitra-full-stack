@@ -4,8 +4,8 @@ import { Moon, Sun, Pill } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { useTheme } from "@/components/theme-provider"
 
-export function Header() {
-  const { theme, setTheme, resolvedTheme } = useTheme()
+export function Header({ onFeaturesClick }: { onFeaturesClick: () => void }) {
+  const { setTheme, resolvedTheme } = useTheme()
 
   const toggleTheme = () => {
     setTheme(resolvedTheme === "dark" ? "light" : "dark")
@@ -13,7 +13,9 @@ export function Header() {
 
   return (
     <header className="sticky top-0 z-50 w-full border-b border-border/40 bg-card/60 backdrop-blur-xl supports-[backdrop-filter]:bg-card/40">
-      <div className="containera mx-auto flex h-16 items-center justify-between px-4">
+      <div className="mx-auto flex h-16 items-center justify-between px-4">
+        
+        {/* Logo */}
         <div className="flex items-center gap-2">
           <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-gradient-to-br from-primary to-accent">
             <Pill className="h-5 w-5 text-primary-foreground" />
@@ -23,19 +25,18 @@ export function Header() {
           </span>
         </div>
 
-        <nav className="hidden items-center gap-6 md:flex">
-          <a href="#" className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
+        {/* Right Section */}
+        <div className="flex items-center gap-3">
+          
+          {/* Features Button */}
+          <Button
+            onClick={onFeaturesClick}
+            className="bg-orange-500 hover:bg-orange-600 text-white rounded-full px-4"
+          >
             Features
-          </a>
-          <a href="#" className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
-            How it Works
-          </a>
-          <a href="#" className="text-sm font-medium text-muted-foreground transition-colors hover:text-foreground">
-            About
-          </a>
-        </nav>
+          </Button>
 
-        <div className="flex items-center gap-2">
+          {/* Theme Toggle */}
           <Button
             variant="ghost"
             size="icon"
@@ -49,9 +50,7 @@ export function Header() {
               <Moon className="h-5 w-5" />
             )}
           </Button>
-          <Button className="hidden bg-gradient-to-r from-primary to-accent text-primary-foreground hover:opacity-90 sm:flex">
-            Get Started
-          </Button>
+
         </div>
       </div>
     </header>

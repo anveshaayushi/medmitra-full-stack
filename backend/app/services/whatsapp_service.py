@@ -1,6 +1,7 @@
 import os
 from twilio.rest import Client as TwilioClient
-
+from dotenv import load_dotenv
+load_dotenv()
 # ── Changes from original twilio.py ──────────────────────────────────────
 # 1. Removed top-level script block (json.load, input(), direct sends)
 # 2. Removed hardcoded file reading — receives analysis_result dict directly

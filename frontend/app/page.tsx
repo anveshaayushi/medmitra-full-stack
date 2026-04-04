@@ -5,6 +5,7 @@ import { Header } from "@/components/header";
 import { HeroSection } from "@/components/hero-section";
 import { ResultsDashboard } from "@/components/results-dashboard";
 import { ThemeProvider } from "@/components/theme-provider";
+import { Features } from "@/components/features";
 
 export interface AnalysisResult {
   medications: {
@@ -28,8 +29,8 @@ export default function DawaAI() {
   const [analysisResult, setAnalysisResult] = useState<AnalysisResult | null>(null);
   const [rawResult, setRawResult] = useState<Record<string, unknown>>({});
   const [isAnalyzing, setIsAnalyzing] = useState(false);
+  const [showFeatures, setShowFeatures] = useState(false); // ✅ added
 
-  // ✅ UPDATED: now accepts multiple files
   const handleAnalyze = async (files: File[]) => {
     setIsAnalyzing(true);
 
@@ -37,7 +38,7 @@ export default function DawaAI() {
       const formData = new FormData();
 
       files.forEach((file) => {
-        formData.append("files", file); // IMPORTANT: backend expects "files"
+        formData.append("files", file);
       });
 
       const response = await fetch("http://127.0.0.1:8000/api/analyze-multiple", {
@@ -48,7 +49,6 @@ export default function DawaAI() {
       if (!response.ok) throw new Error("Failed to analyze prescription");
 
       const dataResponse = await response.json();
-      console.log("API RESPONSE:", dataResponse);
 
       setRawResult(dataResponse);
 
@@ -68,43 +68,51 @@ export default function DawaAI() {
 
         warnings:
   dataResponse.clinical_alerts
-    ?.filter((w: any) => w.severity !== "low")   // 🔥 REMOVE LOW
+    ?.filter((w: any) => w.severity !== "low")
     .map((w: any) => ({
       type:
         w.severity === "high"
           ? "high"
           : "moderate",
       title: w.drugs_involved?.join(" + ") || "Drug Interaction",
-      description: `${w.what_happens || w.mechanism || w.message || "Interaction detected"} — ${w.what_to_do || w.recommendation || ""}`.trim(),
+      description: `${
+        w.what_happens || w.mechanism || w.message || "Interaction detected"
+      } — ${
+        w.what_to_do || w.recommendation || ""
+      }`.trim(),
     })) || [],
 
         duplicates:
           dataResponse.duplicate_alerts?.map((d: any) => d.message) || [],
 
         instructions: [
-          ...(dataResponse.overdose_alerts?.map(
-            (o: any) => `⚠️ Overdose risk: ${o.message}`
-          ) || []),
-          ...(dataResponse.duplicate_alerts?.map(
-            (d: any) => `🔁 ${d.message} — ${d.recommendation}`
-          ) || []),
-          "Always follow your doctor's prescribed dosage and timing.",
-        ],
+  // High risk alerts as instructions
+  ...(dataResponse.clinical_alerts
+    ?.filter((a: any) => a.severity === "high")
+    .map((a: any) => `🚨 ${a.drugs_involved?.join(" + ")}: ${a.recommendation || a.what_to_do || "Consult your doctor immediately."}`)
+    || []),
+  // Overdose warnings
+  ...(dataResponse.clinical_alerts
+    ?.filter((a: any) => a.type === "overdose")
+    .map((a: any) => `⚠️ ${a.message}`)
+    || []),
+  // Duplicate therapy
+  ...(dataResponse.clinical_alerts
+    ?.filter((a: any) => a.type === "duplicate_therapy" || a.type === "class_duplicate")
+    .map((a: any) => `🔁 ${a.message}`)
+    || []),
+  "💊 Complete your full course even if symptoms improve.",
+  "🩺 Always follow your doctor's prescribed dosage and timing.",
+],
 
-        // ✅ shows number of prescriptions analyzed
         summary: `Analyzed ${
           dataResponse.total_prescriptions || files.length
-        } prescription(s) — Patient: ${
-          dataResponse.patient_name || "User"
-        } — Risk Level: ${
-          dataResponse.risk_score?.label || "Unknown"
-        }`,
+        } prescription(s)`,
       };
 
       setAnalysisResult(formattedResult);
     } catch (error) {
-      console.error("ERROR:", error);
-      alert("Something went wrong while analyzing.");
+      console.error(error);
     }
 
     setIsAnalyzing(false);
@@ -118,18 +126,16 @@ export default function DawaAI() {
   return (
     <ThemeProvider>
       <div className="min-h-screen relative overflow-hidden">
-        {/* Background */}
-        <div className="fixed inset-0 overflow-hidden pointer-events-none">
-          <div className="absolute -top-40 -right-40 w-96 h-96 bg-orange-glow/20 rounded-full blur-3xl" />
-          <div className="absolute top-1/4 -left-32 w-80 h-80 bg-coral/15 rounded-full blur-3xl" />
-          <div className="absolute bottom-1/4 right-1/4 w-72 h-72 bg-peach/20 rounded-full blur-3xl" />
-          <div className="absolute -bottom-20 left-1/3 w-96 h-96 bg-orange-glow/10 rounded-full blur-3xl" />
-        </div>
 
         <div className="relative z-10">
-          <Header />
+          
+          {/* ✅ FIXED HEADER */}
+          <Header onFeaturesClick={() => setShowFeatures(true)} />
 
-          {analysisResult ? (
+          {/* ✅ MAIN SWITCH LOGIC */}
+          {showFeatures ? (
+            <Features onBack={() => setShowFeatures(false)} />
+          ) : analysisResult ? (
             <ResultsDashboard
               result={analysisResult}
               rawResult={rawResult}
@@ -137,11 +143,12 @@ export default function DawaAI() {
             />
           ) : (
             <HeroSection
-              onAnalyze={handleAnalyze}   // ✅ now expects File[]
+              onAnalyze={handleAnalyze}
               isAnalyzing={isAnalyzing}
             />
           )}
         </div>
+
       </div>
     </ThemeProvider>
   );
