@@ -1,0 +1,107 @@
+.auth-wrapper {
+  display: flex;
+  height: 100vh;
+}
+
+/* LEFT */
+.auth-left {
+  width: 50%;
+  padding: 60px;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  background: white;
+}
+
+.auth-left h1 {
+  font-size: 32px;
+  margin-bottom: 10px;
+}
+
+.auth-left p {
+  color: #666;
+  margin-bottom: 20px;
+}
+
+/* BACK BUTTON */
+.back {
+  margin-bottom: 20px;
+  color: #ff6b3d;
+  cursor: pointer;
+  font-weight: 500;
+}
+
+/* INPUT */
+.auth-left input {
+  padding: 14px;
+  border-radius: 25px;
+  border: 1px solid #ddd;
+  margin-bottom: 15px;
+}
+
+/* BUTTON */
+.auth-left button {
+  padding: 14px;
+  border-radius: 25px;
+  background: #ff6b3d;
+  color: white;
+  border: none;
+  font-size: 16px;
+  cursor: pointer;
+}
+
+/* DIVIDER */
+.divider {
+  text-align: center;
+  margin: 20px 0;
+  color: #aaa;
+}
+
+/* SOCIAL */
+.socials {
+  display: flex;
+  justify-content: center;
+  gap: 15px;
+}
+
+.socials div {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  border: 1px solid #ddd;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+/* BOTTOM */
+.bottom-text {
+  margin-top: 20px;
+  text-align: center;
+}
+
+.bottom-text span {
+  color: green;
+  cursor: pointer;
+}
+
+/* RIGHT */
+.auth-right {
+  width: 50%;
+  background: #e8f5e9;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  padding: 40px;
+}
+
+.hero-img {
+  width: 220px;
+  margin-bottom: 20px;
+}
+
+.auth-right h2 {
+  margin-bottom: 10px;
+}

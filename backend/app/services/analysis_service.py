@@ -4,6 +4,8 @@ import re
 import time
 from itertools import combinations
 from google import genai
+from app.services.key_manager import get_best_key, record_key_usage, mark_key_exhausted
+
 from dotenv import load_dotenv
 load_dotenv()
 
@@ -76,6 +78,7 @@ Field rules:
   - Sort medication_summary alphabetically, clinical_alerts high→medium→low
   - Never omit a key, use null instead
   - drugs_involved: always use the ORIGINAL name exactly as written in the prescription input (e.g. "ZERODOL MR" not "aceclofenac"). Never use generic names in drugs_involved.
+  - mechanism and recommendation must be written in simple, plain English that a patient with no medical background can understand. Avoid medical jargon like "CYP1A2", "serotonergic", "hepatotoxicity", "contraindicated". Instead say things like "these two medicines together can slow your breathing dangerously" or "this combination can cause your stomach to bleed". Try to keep it short and to the point and informative(short doesn't mean to reduce information). recommendation must be a clear action like "Do not take both" or "Take them 2 hours apart" or "Tell your doctor immediately".
 """
 
 
@@ -157,35 +160,50 @@ def analyze_medications(meds: list, patient_name: str = "User") -> dict:
         return {
             "status":             "no_medications_found",
             "patient_name":       patient_name.title(),
-            "risk_score":         {
-                "score": 0, "label": "UNANALYZED",
-                "high_alerts": 0, "medium_alerts": 0,
-                "low_alerts": 0, "total_alert_count": 0,
-            },
+            "risk_score":         {"score": 0, "label": "UNANALYZED",
+                                   "high_alerts": 0, "medium_alerts": 0,
+                                   "low_alerts": 0, "total_alert_count": 0},
             "clinical_alerts":    [],
             "duplicate_alerts":   [],
             "overdose_alerts":    [],
             "medication_summary": [],
         }
 
-    api_key = os.getenv("GEMINI_API_KEY", "").strip()
+    # ── Smart key selection ───────────────────────────────────────────────
+    api_key = get_best_key()
     if not api_key:
-        raise ValueError("GEMINI_API_KEY not set in environment")
+        raise ValueError("All Gemini API keys exhausted for today. Try again tomorrow.")
 
     client = genai.Client(api_key=api_key)
-    client.models.generate_content(model=GEMINI_MODEL, contents="reply: ok")
-    time.sleep(1)
+    
 
     prompt = f"Patient name: {patient_name}\n\nPrescription:\n{json.dumps(meds, indent=2)}"
 
-    response = client.models.generate_content(
-        model=GEMINI_MODEL,
-        contents=prompt,
-        config={
-            "system_instruction": SYSTEM_PROMPT,
-            "temperature": 0.1,
-        },
-    )
+    try:
+        response = client.models.generate_content(
+            model=GEMINI_MODEL,
+            contents=prompt,
+            config={"system_instruction": SYSTEM_PROMPT, "temperature": 0.1},
+        )
+        record_key_usage(api_key)  # ← track successful call
+
+    except Exception as e:
+        err = str(e).lower()
+        if "quota" in err or "429" in err or "limit" in err or "exhausted" in err:
+            mark_key_exhausted(api_key)  # ← mark exhausted, retry with next key
+            # Retry once with next key
+            api_key = get_best_key()
+            if not api_key:
+                raise ValueError("All Gemini API keys exhausted for today.")
+            client = genai.Client(api_key=api_key)
+            response = client.models.generate_content(
+                model=GEMINI_MODEL,
+                contents=prompt,
+                config={"system_instruction": SYSTEM_PROMPT, "temperature": 0.1},
+            )
+            record_key_usage(api_key)
+        else:
+            raise
 
     try:
         result = json.loads(_strip_fences(response.text))

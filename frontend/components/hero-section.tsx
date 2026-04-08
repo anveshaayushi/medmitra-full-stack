@@ -6,6 +6,7 @@ import { Upload, FileImage, Sparkles, Shield, Clock, X } from "lucide-react"
 import { Button } from "@/components/ui/button"
 import { cn } from "@/lib/utils"
 import { Spinner } from "@/components/ui/spinner"
+import { useRouter } from "next/navigation";
 
 interface HeroSectionProps {
   onAnalyze: (files: File[]) => Promise<void>;
@@ -13,6 +14,8 @@ interface HeroSectionProps {
 }
 
 export function HeroSection({ onAnalyze, isAnalyzing }: HeroSectionProps) {
+  const router = useRouter(); // ✅ FIXED
+
   const [selectedFiles, setSelectedFiles] = useState<File[]>([])
   const [preview, setPreview] = useState<string | null>(null)
 
@@ -20,7 +23,6 @@ export function HeroSection({ onAnalyze, isAnalyzing }: HeroSectionProps) {
     if (acceptedFiles.length > 0) {
       setSelectedFiles(acceptedFiles)
 
-      // show preview of first image only
       const reader = new FileReader()
       reader.onload = () => {
         setPreview(reader.result as string)
@@ -35,13 +37,13 @@ export function HeroSection({ onAnalyze, isAnalyzing }: HeroSectionProps) {
       "image/*": [".png", ".jpg", ".jpeg", ".webp"],
       "application/json": [".json"],
     },
-    maxFiles: 5, // ✅ allow multiple uploads
+    maxFiles: 5,
     disabled: isAnalyzing,
   })
 
   const handleAnalyze = () => {
     if (selectedFiles.length > 0) {
-      onAnalyze(selectedFiles) // ✅ FIXED
+      onAnalyze(selectedFiles)
     }
   }
 
@@ -52,24 +54,46 @@ export function HeroSection({ onAnalyze, isAnalyzing }: HeroSectionProps) {
 
   return (
     <main className="container mx-auto px-4 py-12 md:py-20">
+
       {/* Hero text */}
       <div className="mx-auto max-w-3xl text-center">
         <div className="mb-4 inline-flex items-center gap-2 rounded-full border border-primary/20 bg-primary/5 px-4 py-1.5 text-sm font-medium text-primary">
           <Sparkles className="h-4 w-4" />
           AI-Powered Analysis
         </div>
+
         <h1 className="mb-4 text-pretty text-4xl font-bold tracking-tight text-foreground md:text-5xl lg:text-6xl">
           Smart Prescription
           <span className="bg-gradient-to-r from-primary to-accent bg-clip-text text-transparent"> Analysis</span>
         </h1>
-        <p className="mx-auto mb-12 max-w-2xl text-balance text-lg text-muted-foreground md:text-xl">
+
+        <p className="mx-auto mb-8 max-w-2xl text-balance text-lg text-muted-foreground md:text-xl">
           Upload your prescription(s) and let our AI analyze medications, detect interactions, and provide personalized safety recommendations.
         </p>
+
+        {/* 🔥 CTA BUTTONS (ADDED HERE) */}
+        <div className="flex justify-center gap-4 mb-12">
+          <Button
+            onClick={() => router.push("/signup")}
+            className="px-6 py-3 rounded-full text-base font-semibold"
+          >
+            Get Started
+          </Button>
+
+          <Button
+            variant="outline"
+            onClick={() => router.push("/login")}
+            className="px-6 py-3 rounded-full text-base"
+          >
+            Login
+          </Button>
+        </div>
       </div>
 
       {/* Upload card */}
       <div className="mx-auto max-w-2xl">
         <div className="rounded-2xl border border-border/50 bg-card/70 p-6 shadow-xl backdrop-blur-xl md:p-8">
+
           <div
             {...getRootProps()}
             className={cn(
@@ -90,7 +114,6 @@ export function HeroSection({ onAnalyze, isAnalyzing }: HeroSectionProps) {
                   className="mx-auto max-h-64 rounded-lg object-contain"
                 />
 
-                {/* show file count */}
                 {selectedFiles.length > 1 && (
                   <p className="mt-2 text-sm text-muted-foreground">
                     + {selectedFiles.length - 1} more file(s)
@@ -120,9 +143,11 @@ export function HeroSection({ onAnalyze, isAnalyzing }: HeroSectionProps) {
                     <Upload className="h-8 w-8 text-primary" />
                   )}
                 </div>
+
                 <p className="mb-2 text-lg font-medium text-foreground">
                   {isDragActive ? "Drop your prescriptions here" : "Drag & drop your prescriptions"}
                 </p>
+
                 <p className="text-sm text-muted-foreground">
                   Multiple files supported • PNG, JPG, WEBP, JSON
                 </p>
@@ -133,7 +158,7 @@ export function HeroSection({ onAnalyze, isAnalyzing }: HeroSectionProps) {
           <Button
             onClick={handleAnalyze}
             disabled={selectedFiles.length === 0 || isAnalyzing}
-            className="mt-6 w-full bg-gradient-to-r from-primary to-accent py-6 text-lg font-semibold text-primary-foreground shadow-lg transition-all hover:opacity-90 hover:shadow-xl disabled:opacity-50"
+            className="mt-6 w-full bg-gradient-to-r from-primary to-accent py-6 text-lg font-semibold text-primary-foreground shadow-lg"
           >
             {isAnalyzing ? (
               <>
@@ -165,6 +190,7 @@ export function HeroSection({ onAnalyze, isAnalyzing }: HeroSectionProps) {
           <span className="text-sm text-muted-foreground">AI-Powered Insights</span>
         </div>
       </div>
+
     </main>
   )
 }

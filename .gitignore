@@ -8,11 +8,15 @@ __pycache__/
 *.sqlite3
 .env
 venv/
+<<<<<<< HEAD
 backend/venv/
 
 # =========================
 # Node / React
 # =========================
+=======
+# Node
+>>>>>>> f3ec054 (feat: dataset caching, API key rotation, and auth UI (login/signup))
 node_modules/
 .next/
 dist/
